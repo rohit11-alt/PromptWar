@@ -1,10 +1,5 @@
 const { GoogleGenAI, Type } = require('@google/genai');
-const retry = require('async-retry');
 const { analyzeHeuristics } = require('./heuristicScanner');
-
-// Initialize Gemini Client if key exists
-const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 /**
  * Analyzes content (text and/or file buffer) for phishing threats using Gemini API
@@ -33,68 +28,49 @@ async function scanForPhishing({ text, file }) {
         throw new Error("Please provide text or a document to scan.");
     }
 
-    // Run offline heuristic analysis first (instant 0ms)
+    // Run instant offline heuristic analysis first (0ms latency)
     const heuristicResults = analyzeHeuristics(text || '');
 
-    // If no API key configured, return heuristic result immediately without waiting
-    if (!ai || !apiKey || apiKey === 'your_actual_gemini_api_key_here') {
-        const score = heuristicResults.heuristicScore;
-        const flags = heuristicResults.flags.length > 0
-            ? heuristicResults.flags
-            : ["No automatic heuristic flags triggered. Please review domain and sender details manually."];
+    // Read API key dynamically (supports local .env and Vercel environment variables)
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
 
-        const summary = score >= 50
-            ? "High threat potential detected via heuristic threat patterns."
-            : score >= 20
-                ? "Moderate threat level. Exercise caution before opening links or sharing personal details."
-                : "No high-risk phishing patterns detected in initial scan.";
-
-        return {
-            threatScore: score,
-            flags,
-            summary
-        };
+    // If no valid API key is present, return instant heuristic result
+    if (!apiKey || apiKey === 'your_actual_gemini_api_key_here' || apiKey.includes('your_gemini_api_key')) {
+        return buildHeuristicResponse(heuristicResults);
     }
 
     try {
-        const structuredResponseText = await retry(async (bail) => {
-            try {
-                // Try gemini-2.5-flash with fast 5-second timeout
-                const response = await ai.models.generateContent({
-                    model: 'gemini-3.6-flash',
-                    contents: [
-                        "You are an expert cybersecurity AI. Analyze the following job offer/email for phishing. Identify specific red flags.",
-                        ...contents
-                    ],
-                    config: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: Type.OBJECT,
-                            properties: {
-                                threatScore: { type: Type.INTEGER, description: "Scam probability from 0 to 100" },
-                                flags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exact suspicious quotes or red flags identified" },
-                                summary: { type: Type.STRING, description: "A 2-sentence explanation of the final verdict" }
-                            },
-                            required: ["threatScore", "flags", "summary"]
-                        }
-                    }
-                });
+        const ai = new GoogleGenAI({ apiKey });
 
-                return response.text;
-            } catch (apiError) {
-                // If model is not found or key invalid, bail immediately to fallback without retrying
-                bail(apiError);
-                return;
+        // Enforce a strict 3.5-second timeout on Gemini API call for blazing fast UX
+        const apiPromise = ai.models.generateContent({
+            model: 'gemini-3.6-flash',
+            contents: [
+                "You are an expert cybersecurity AI. Analyze the following job offer or email for phishing/scam threats. Identify specific red flags.",
+                ...contents
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        threatScore: { type: Type.INTEGER, description: "Scam probability from 0 to 100" },
+                        flags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exact suspicious quotes or red flags identified" },
+                        summary: { type: Type.STRING, description: "A 2-sentence explanation of the final verdict" }
+                    },
+                    required: ["threatScore", "flags", "summary"]
+                }
             }
-        }, {
-            retries: 1,
-            minTimeout: 500,
-            maxTimeout: 1000
         });
 
-        const parsed = JSON.parse(structuredResponseText);
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("API_TIMEOUT")), 3500);
+        });
 
-        // Merge heuristic flags if not already present
+        const response = await Promise.race([apiPromise, timeoutPromise]);
+        const parsed = JSON.parse(response.text);
+
+        // Combine Gemini AI flags with heuristic rules
         const combinedFlags = Array.from(new Set([...(parsed.flags || []), ...heuristicResults.flags]));
         const finalThreatScore = Math.max(parsed.threatScore || 0, heuristicResults.heuristicScore);
 
@@ -103,26 +79,33 @@ async function scanForPhishing({ text, file }) {
             flags: combinedFlags,
             summary: parsed.summary || "Threat analysis completed."
         };
+
     } catch (error) {
-        console.warn("Gemini API call skipped/failed, using fast heuristic verdict:", error.message);
-
-        const score = heuristicResults.heuristicScore;
-        const flags = heuristicResults.flags.length > 0
-            ? heuristicResults.flags
-            : ["No automatic heuristic flags triggered. Please review domain and sender details manually."];
-
-        const summary = score >= 50
-            ? "High threat potential detected via heuristic threat patterns."
-            : score >= 20
-                ? "Moderate threat level. Exercise caution before opening links or sharing personal details."
-                : "No high-risk phishing patterns detected in initial scan.";
-
-        return {
-            threatScore: score,
-            flags,
-            summary
-        };
+        console.warn("Gemini API call timed out or returned error, serving fast heuristic verdict:", error.message);
+        return buildHeuristicResponse(heuristicResults);
     }
+}
+
+/**
+ * Builds standard structured threat response from heuristic scanner
+ */
+function buildHeuristicResponse(heuristicResults) {
+    const score = heuristicResults.heuristicScore;
+    const flags = heuristicResults.flags.length > 0
+        ? heuristicResults.flags
+        : ["No automatic heuristic flags triggered. Please review domain and sender details manually."];
+
+    const summary = score >= 50
+        ? "High threat potential detected via heuristic threat patterns."
+        : score >= 20
+            ? "Moderate threat level. Exercise caution before opening links or sharing personal details."
+            : "No high-risk phishing patterns detected in initial scan.";
+
+    return {
+        threatScore: score,
+        flags,
+        summary
+    };
 }
 
 module.exports = {
