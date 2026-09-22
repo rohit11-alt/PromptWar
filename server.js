@@ -42,7 +42,7 @@ app.use((err, req, res, next) => {
 // Export app instance for automated testing with Supertest
 if (process.env.NODE_ENV !== 'test') {
     app.listen(PORT, () => {
-        console.log(`PhishGuard AI Server running on port ${PORT}`);
+        console.log(`SentinelOffer AI Server running on port ${PORT}`);
     });
 }
 

@@ -1,11 +1,11 @@
-# 🛡️ PhishGuard AI - Fake Offer Letter & Phishing Inspector
+# 🛡️ SentinelOffer AI - Fake Offer Letter & Phishing Inspector
 
 [![System Operational](https://img.shields.io/badge/System-Operational-brightgreen)](#)
 [![Powered by Gemini](https://img.shields.io/badge/AI-Gemini%203.6%20Flash-blue)](#)
 [![Security Headers](https://img.shields.io/badge/Security-Helmet%20%2B%20RateLimit-success)](#)
 [![Test Suite](https://img.shields.io/badge/Tests-Jest%20%2B%20Supertest-pass)](#)
 
-**PhishGuard AI** is an intelligent, real-time cybersecurity assistant designed to protect job seekers, students, and professionals from fake employment offer letters, phishing emails, and recruitment fraud using **Google Gemini 3.6 Flash**.
+**SentinelOffer AI** is an intelligent, real-time cybersecurity assistant designed to protect job seekers, students, and professionals from fake employment offer letters, phishing emails, and recruitment fraud using **Google Gemini 3.6 Flash**.
 
 ---
 
@@ -19,7 +19,7 @@
 
 ## 🏗️ 2. Technical Approach & Architecture
 
-PhishGuard AI utilizes a **Hybrid Multi-Tier Threat Detection Architecture**:
+SentinelOffer AI utilizes a **Hybrid Multi-Tier Threat Detection Architecture**:
 
 ```
  ┌────────────────┐       ┌────────────────────────┐       ┌──────────────────────┐

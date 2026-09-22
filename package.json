@@ -1,7 +1,7 @@
 {
-    "name": "phishguard-ai",
+    "name": "sentinel-offer-ai",
     "version": "1.0.0",
-    "description": "Fake Offer Letter & Phishing Inspector powered by Gemini API",
+    "description": "SentinelOffer AI - Intelligent Fake Offer Letter & Phishing Inspector powered by Gemini API",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",

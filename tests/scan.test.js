@@ -4,14 +4,14 @@ const { analyzeHeuristics } = require('../src/services/heuristicScanner');
 
 jest.setTimeout(15000);
 
-describe('PhishGuard AI API Tests', () => {
+describe('SentinelOffer AI API Tests', () => {
 
     describe('GET /api/health', () => {
         it('should return system health status 200 OK', async () => {
             const res = await request(app).get('/api/health');
             expect(res.statusCode).toBe(200);
             expect(res.body).toHaveProperty('status', 'ok');
-            expect(res.body).toHaveProperty('service', 'PhishGuard AI');
+            expect(res.body).toHaveProperty('service', 'SentinelOffer AI');
         });
     });
 

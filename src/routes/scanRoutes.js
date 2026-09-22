@@ -17,7 +17,7 @@ const upload = multer({
 router.get('/health', (req, res) => {
     res.json({
         status: "ok",
-        service: "PhishGuard AI",
+        service: "SentinelOffer AI",
         timestamp: new Date().toISOString(),
         uptime: process.uptime()
     });
