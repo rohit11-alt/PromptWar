@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="PhishGuard AI - Intelligent Threat Detection and Fake Offer Letter Inspector powered by Gemini API">
+    <title>PhishGuard AI | Intelligent Threat Detection</title>
+
+    <!-- Load Inter font for that premium Precedent/Vercel look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'sleek': '0 0 0 1px rgba(0,0,0,.08), 0 4px 6px -1px rgba(0,0,0,.04)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Subtle dot background pattern typical of premium dev tools */
+        body {
+            background-color: #fafafa;
+            background-image: radial-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+
+        /* Hide scrollbar for a cleaner look */
+        textarea::-webkit-scrollbar {
+            display: none;
+        }
+
+        textarea {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body class="text-gray-900 min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+
+    <main class="w-full max-w-3xl space-y-8">
+
+        <!-- Header Section -->
+        <div class="text-center space-y-3">
+            <span
+                class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-gray-200 shadow-sm text-sm font-medium text-gray-600 mb-4"
+                aria-label="System operational status indicator">
+                <span class="flex h-2 w-2 rounded-full bg-green-500"></span>
+                System Operational
+            </span>
+            <h1
+                class="text-4xl sm:text-5xl font-bold tracking-tight bg-gradient-to-br from-black to-stone-500 bg-clip-text text-transparent">
+                PhishGuard AI
+            </h1>
+            <p class="text-gray-500 text-lg max-w-xl mx-auto">
+                Paste suspicious emails, job offers, or messages below for instant AI-powered threat analysis.
+            </p>
+
+            <!-- Quick Presets for Easy Evaluation -->
+            <div class="flex items-center justify-center gap-2 pt-2 text-xs">
+                <span class="text-gray-400 font-medium">Quick Test:</span>
+                <button type="button" onclick="loadSample('scam')" class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors font-medium">
+                    Sample Scam Offer
+                </button>
+                <button type="button" onclick="loadSample('safe')" class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors font-medium">
+                    Legitimate Email
+                </button>
+            </div>
+        </div>
+
+        <!-- Sleek Input Card -->
+        <div class="bg-white rounded-2xl shadow-sleek overflow-hidden transition-all duration-300">
+            <form id="scanForm" class="flex flex-col">
+                <label for="textInput" class="sr-only">Input text to analyze for phishing or scam threats</label>
+                <textarea id="textInput" rows="8"
+                    class="w-full p-6 text-gray-700 placeholder-gray-400 bg-transparent outline-none resize-none text-base leading-relaxed focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-inset"
+                    placeholder="Subject: Urgent: Your account has been suspended...&#10;&#10;Dear user, kindly click the link below to verify your identity within 24 hours to prevent account deletion."
+                    required></textarea>
+
+                <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                    <p class="text-xs text-gray-400 font-medium">Powered by Gemini 3.6 Flash</p>
+                    <button type="submit" id="submitBtn"
+                        class="inline-flex items-center justify-center rounded-full bg-black px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black transition-all active:scale-95">
+                        Analyze Document
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Dynamic Results Section (Hidden initially) -->
+        <div id="resultSection"
+            aria-live="polite" aria-atomic="true"
+            class="hidden opacity-0 transform translate-y-4 transition-all duration-500 ease-out space-y-4">
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <!-- Threat Score Card -->
+                <div id="scoreCard"
+                    class="sm:col-span-1 bg-white rounded-2xl border border-gray-200 p-6 flex flex-col items-center justify-center text-center shadow-sm">
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Threat Score</p>
+                    <div id="scoreDisplay" class="text-6xl font-bold tracking-tighter mb-1">--</div>
+                    <span id="verdictBadge"
+                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold mt-2">
+                        Analyzing
+                    </span>
+                </div>
+
+                <!-- AI Summary Card -->
+                <div
+                    class="sm:col-span-2 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col justify-center">
+                    <h2 class="text-sm font-semibold text-gray-900 mb-2">Executive Summary</h2>
+                    <p id="summaryText" class="text-gray-600 text-sm leading-relaxed"></p>
+                </div>
+            </div>
+
+            <!-- Red Flags List -->
+            <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                <h2 class="text-sm font-semibold text-gray-900 mb-4">Detected Anomalies</h2>
+                <ul id="flagsList" class="space-y-3"></ul>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        const samples = {
+            scam: `Subject: URGENT: Remote Data Analyst Offer Letter - $75/hr (Immediate Hire)
+From: careers-hr-google-recruiters@gmail.com
+
+Dear Candidate,
+
+Congratulations! We are pleased to offer you the position of Senior Remote Data Analyst at Google LLC. Your starting salary will be $75 per hour paid weekly. 
+
+Because this is a remote role, you must purchase your home office equipment package ($1,850 value) using our authorized vendor via Apple Gift Cards or Telegram transfer. We will mail you a cashier's check to cover this cost within 24 hours.
+
+To finalize your onboarding within 24 hours, contact Mr. David HR Manager on Telegram: @GoogleRecruiter_David or WhatsApp +1-555-019-2834.
+
+Kindly act immediately to prevent offer expiration!`,
+
+            safe: `Subject: Invitation to Interview: Software Engineer - Cloud Systems
+From: hr-recruiting@acme-corp.com
+
+Hi Alex,
+
+Thank you for applying for the Software Engineer role at Acme Corp. We were impressed by your background and would love to schedule a 30-minute introductory call with our engineering team manager.
+
+Please let us know your availability over the next 3 business days via our official portal at acme-corp.com/careers/schedule.
+
+Best regards,
+Sarah Jenkins
+Talent Acquisition Team
+Acme Corporation`
+        };
+
+        function loadSample(type) {
+            const input = document.getElementById('textInput');
+            if (samples[type]) {
+                input.value = samples[type];
+                input.focus();
+            }
+        }
+
+        document.getElementById('scanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const btn = document.getElementById('submitBtn');
+            const resultSection = document.getElementById('resultSection');
+            const textInput = document.getElementById('textInput').value;
+
+            // Premium Loading State
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Scanning...`;
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+            btn.classList.add('opacity-80', 'cursor-not-allowed');
+
+            // Hide results if re-scanning
+            resultSection.classList.remove('opacity-100', 'translate-y-0');
+            resultSection.classList.add('hidden', 'opacity-0', 'translate-y-4');
+
+            try {
+                const response = await fetch('/api/scan-offer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: textInput })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
+                const score = data.threatScore;
+                const scoreDisplay = document.getElementById('scoreDisplay');
+                const verdictBadge = document.getElementById('verdictBadge');
+                const scoreCard = document.getElementById('scoreCard');
+
+                scoreDisplay.textContent = `${score}`;
+
+                // Muted color theming matching design
+                scoreCard.className = 'sm:col-span-1 rounded-2xl border p-6 flex flex-col items-center justify-center text-center shadow-sm transition-colors duration-300';
+
+                if (score < 30) {
+                    scoreCard.classList.add('bg-green-50', 'border-green-100');
+                    scoreDisplay.className = 'text-6xl font-bold tracking-tighter mb-1 text-green-700';
+                    verdictBadge.textContent = 'Safe Document';
+                    verdictBadge.className = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold mt-2 bg-green-100 text-green-700';
+                } else if (score < 70) {
+                    scoreCard.classList.add('bg-amber-50', 'border-amber-100');
+                    scoreDisplay.className = 'text-6xl font-bold tracking-tighter mb-1 text-amber-700';
+                    verdictBadge.textContent = 'Suspicious';
+                    verdictBadge.className = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold mt-2 bg-amber-100 text-amber-700';
+                } else {
+                    scoreCard.classList.add('bg-rose-50', 'border-rose-100');
+                    scoreDisplay.className = 'text-6xl font-bold tracking-tighter mb-1 text-rose-700';
+                    verdictBadge.textContent = 'High-Risk Scam';
+                    verdictBadge.className = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold mt-2 bg-rose-100 text-rose-700';
+                }
+
+                document.getElementById('summaryText').textContent = data.summary;
+
+                const flagsList = document.getElementById('flagsList');
+                flagsList.innerHTML = '';
+                if (data.flags && data.flags.length > 0) {
+                    data.flags.forEach(flag => {
+                        const li = document.createElement('li');
+                        li.className = "flex items-start gap-3 text-sm text-gray-600";
+                        li.innerHTML = `<svg class="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> <span class="pt-0.5">${flag}</span>`;
+                        flagsList.appendChild(li);
+                    });
+                } else {
+                    flagsList.innerHTML = '<li class="text-gray-500 text-sm italic">No malicious patterns detected.</li>';
+                }
+
+                // Smooth reveal
+                resultSection.classList.remove('hidden');
+                setTimeout(() => {
+                    resultSection.classList.remove('opacity-0', 'translate-y-4');
+                    resultSection.classList.add('opacity-100', 'translate-y-0');
+                }, 50);
+
+            } catch (err) {
+                alert('Scan interrupted: ' + err.message);
+            } finally {
+                btn.innerHTML = 'Analyze Document';
+                btn.disabled = false;
+                btn.removeAttribute('aria-busy');
+                btn.classList.remove('opacity-80', 'cursor-not-allowed');
+            }
+        });
+    </script>
+</body>
+
+</html>
