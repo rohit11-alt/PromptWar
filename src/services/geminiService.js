@@ -1,5 +1,7 @@
 const { GoogleGenAI, Type } = require('@google/genai');
 const { analyzeHeuristics } = require('./heuristicScanner');
+const scanCache = require('../utils/cache');
+const logger = require('../utils/logger');
 
 /**
  * Analyzes content (text and/or file buffer) for phishing threats using Gemini API
@@ -28,21 +30,31 @@ async function scanForPhishing({ text, file }) {
         throw new Error("Please provide text or a document to scan.");
     }
 
-    // Run instant offline heuristic analysis first (0ms latency)
+    // 1. Check In-Memory SHA-256 Cache for 0ms efficiency
+    const cacheKey = scanCache.generateKey(text, file ? file.buffer : null);
+    const cachedVerdict = scanCache.get(cacheKey);
+    if (cachedVerdict) {
+        logger.info("Serving cached threat verdict for identical request", { cacheKey });
+        return cachedVerdict;
+    }
+
+    // 2. Run instant offline heuristic analysis
     const heuristicResults = analyzeHeuristics(text || '');
 
-    // Read API key dynamically (supports local .env and Vercel environment variables)
+    // Read API key dynamically
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
 
     // If no valid API key is present, return instant heuristic result
     if (!apiKey || apiKey === 'your_actual_gemini_api_key_here' || apiKey.includes('your_gemini_api_key')) {
-        return buildHeuristicResponse(heuristicResults);
+        const heuristicVerdict = buildHeuristicResponse(heuristicResults);
+        scanCache.set(cacheKey, heuristicVerdict);
+        return heuristicVerdict;
     }
 
     try {
         const ai = new GoogleGenAI({ apiKey });
 
-        // Enforce a strict 3.5-second timeout on Gemini API call for blazing fast UX
+        // Enforce a strict 3.5-second timeout on Gemini API call
         const apiPromise = ai.models.generateContent({
             model: 'gemini-3.6-flash',
             contents: [
@@ -74,20 +86,28 @@ async function scanForPhishing({ text, file }) {
         const combinedFlags = Array.from(new Set([...(parsed.flags || []), ...heuristicResults.flags]));
         const finalThreatScore = Math.max(parsed.threatScore || 0, heuristicResults.heuristicScore);
 
-        return {
+        const verdict = {
             threatScore: finalThreatScore,
             flags: combinedFlags,
             summary: parsed.summary || "Threat analysis completed."
         };
 
+        // Cache verdict for future requests
+        scanCache.set(cacheKey, verdict);
+        return verdict;
+
     } catch (error) {
-        console.warn("Gemini API call timed out or returned error, serving fast heuristic verdict:", error.message);
-        return buildHeuristicResponse(heuristicResults);
+        logger.warn("Gemini API call timed out or failed, using heuristic verdict", { error: error.message });
+        const fallbackVerdict = buildHeuristicResponse(heuristicResults);
+        scanCache.set(cacheKey, fallbackVerdict);
+        return fallbackVerdict;
     }
 }
 
 /**
  * Builds standard structured threat response from heuristic scanner
+ * @param {Object} heuristicResults
+ * @returns {{ threatScore: number, flags: string[], summary: string }}
  */
 function buildHeuristicResponse(heuristicResults) {
     const score = heuristicResults.heuristicScore;

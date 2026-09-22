@@ -1,10 +1,15 @@
 const request = require('supertest');
 const app = require('../server');
 const { analyzeHeuristics } = require('../src/services/heuristicScanner');
+const scanCache = require('../src/utils/cache');
 
 jest.setTimeout(15000);
 
 describe('SentinelOffer AI API Tests', () => {
+
+    beforeEach(() => {
+        scanCache.clear();
+    });
 
     describe('GET /api/health', () => {
         it('should return system health status 200 OK', async () => {
@@ -45,7 +50,27 @@ describe('SentinelOffer AI API Tests', () => {
             expect(res.body).toHaveProperty('summary');
             expect(typeof res.body.threatScore).toBe('number');
             expect(Array.isArray(res.body.flags)).toBe(true);
-        }, 15000);
+        });
+
+        it('should serve cached response on duplicate request for high efficiency', async () => {
+            const text = "Subject: Duplicate test request for cache validation.";
+            const firstRes = await request(app).post('/api/scan-offer').send({ text });
+            const secondRes = await request(app).post('/api/scan-offer').send({ text });
+
+            expect(firstRes.statusCode).toBe(200);
+            expect(secondRes.statusCode).toBe(200);
+            expect(secondRes.body).toEqual(firstRes.body);
+        });
+
+        it('should accept file attachments (PDF/TXT) and analyze payload', async () => {
+            const fileBuffer = Buffer.from("Urgent offer: Buy gift cards to receive remote laptop.");
+            const res = await request(app)
+                .post('/api/scan-offer')
+                .attach('document', fileBuffer, 'sample_offer.txt');
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body).toHaveProperty('threatScore');
+        });
     });
 
     describe('Heuristic Scanner Unit Tests', () => {
